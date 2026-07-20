@@ -1,0 +1,55 @@
+<!doctype html><html><head><title>Test Simple</title>
+<style>body{margin:0;background:#000}canvas{display:block}#info{position:absolute;top:10px;left:10px;color:#0f0;font-family:monospace;z-index:10;font-size:14px}</style></head>
+<body>
+<div id="info"></div>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.185.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.185.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const i=document.getElementById('info');
+
+// Check WebGL
+try {
+  const c=document.createElement('canvas');
+  const gl=c.getContext('webgl2')||c.getContext('webgl');
+  i.textContent='WebGL: '+(gl?'OK':'NO SOPORTADO');
+  if(!gl){document.body.style.background='red';throw new Error('No WebGL');}
+} catch(e){i.textContent='ERROR: '+e.message;}
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#1a1a2e');
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,50);
+cam.position.set(0,4,6);
+const r=new THREE.WebGLRenderer({antialias:true});
+r.setSize(innerWidth,innerHeight);
+r.shadowMap.enabled=true;
+document.body.appendChild(r.domElement);
+const ctrl=new OrbitControls(cam,r.domElement);
+ctrl.target.set(0,0,0);
+ctrl.update();
+
+scene.add(new THREE.AmbientLight('#fff',0.5));
+const sun=new THREE.DirectionalLight('#fff',1);
+sun.position.set(5,8,5);
+sun.castShadow=true;
+scene.add(sun);
+
+// Floor
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshStandardMaterial({color:'#333'}))).rotation.x=-Math.PI/2;
+
+// Red cube
+scene.add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:'red'}))).position.y=0.5;
+
+// Green sphere
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.5,32,32),new THREE.MeshStandardMaterial({color:'green'}))).position.set(2,0.5,0);
+
+// Blue cylinder
+scene.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1.5,16),new THREE.MeshStandardMaterial({color:'blue'}))).position.set(-2,0.75,0);
+
+i.textContent+=' | Cubo rojo, esfera verde, cilindro azul - deberian verse';
+function anim(){requestAnimationFrame(anim);ctrl.update();r.render(scene,cam);}
+anim();
+</script>
+</body></html>

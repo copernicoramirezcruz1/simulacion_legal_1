@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head><title>Test 3D</title>
+<style>
+  body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #info { position: absolute; top: 10px; left: 10px; color: #fff; font-family: sans-serif; z-index: 10; }
+</style>
+</head>
+<body>
+<div id="info">Cargando...</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.185.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.185.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const info = document.getElementById('info');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#1a1a2e');
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 50);
+camera.position.set(0, 5, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.2, -2);
+controls.update();
+
+// Luz
+scene.add(new THREE.AmbientLight('#304060', 0.3));
+const sun = new THREE.DirectionalLight('#fff8e7', 1.0);
+sun.position.set(8, 10, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+scene.add(sun);
+
+// Piso
+scene.add(new THREE.Mesh(
+  new THREE.PlaneGeometry(16, 16),
+  new THREE.MeshStandardMaterial({ color: '#2a2a40', roughness: 0.8 })
+)).rotation.x = -Math.PI / 2;
+
+// Mesa
+scene.add(new THREE.Mesh(
+  new THREE.BoxGeometry(2, 1, 1.5),
+  new THREE.MeshStandardMaterial({ color: '#3d2314', roughness: 0.5 })
+)).position.set(0, -0.5, -1);
+
+// Personaje - cargar persona.glb
+info.textContent = 'Cargando persona.glb...';
+const loader = new GLTFLoader();
+loader.load(
+  '/models/persona.glb',
+  (gltf) => {
+    info.textContent = 'Modelo cargado OK! (' + gltf.scene.children.length + ' hijos)';
+    gltf.scene.scale.set(0.85, 0.85, 0.85);
+    gltf.scene.position.set(0, 0, -1.5);
+    scene.add(gltf.scene);
+  },
+  (progress) => {
+    const pct = Math.round((progress.loaded / progress.total) * 100);
+    info.textContent = 'Cargando... ' + pct + '%';
+  },
+  (error) => {
+    info.textContent = 'ERROR al cargar modelo: ' + error.message;
+  }
+);
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
