@@ -31,10 +31,12 @@ export function HUD({
   const roleColor = currentRole ? ROLE_COLORS[currentRole] : '#fff';
   const roleLabel = currentRole ? ROLE_LABELS[currentRole] : '';
 
+  const isLongText = currentText.length > 800;
+
   return (
     <div className="absolute inset-0 pointer-events-none">
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 bg-black/70 px-4 py-2 pointer-events-auto">
+      <div className="absolute top-0 left-0 right-0 bg-black/70 px-4 py-2 pointer-events-auto z-50">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-sm font-bold text-amber-400 uppercase tracking-wider">
@@ -46,7 +48,6 @@ export function HUD({
             {progress.toFixed(0)}%
           </div>
         </div>
-        {/* Progress bar */}
         <div className="w-full h-1 bg-gray-800 mt-2 rounded-full overflow-hidden">
           <div
             className="h-full bg-amber-500 transition-all duration-300 rounded-full"
@@ -55,26 +56,23 @@ export function HUD({
         </div>
       </div>
 
-      {/* Error toast */}
       {error && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-900/90 text-red-200 px-4 py-2 rounded-lg text-sm pointer-events-auto">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-red-900/90 text-red-200 px-4 py-2 rounded-lg text-sm pointer-events-auto z-50">
           {error}
         </div>
       )}
 
-      {/* Bottom subtitle / dialog area */}
+      {/* Subtitle area */}
       <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
         <div
-          className="mx-4 mb-4 p-4 rounded-xl bg-black/80 backdrop-blur-sm border transition-colors duration-300"
+          className={`mx-4 mb-4 rounded-xl bg-black/80 backdrop-blur-sm border transition-all duration-300 ${
+            isLongText ? 'p-5 max-h-[40vh]' : 'p-4'
+          }`}
           style={{ borderColor: roleColor }}
         >
-          {/* Role indicator */}
           {currentRole && (
             <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: roleColor }}
-              />
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: roleColor }} />
               <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: roleColor }}>
                 {roleLabel}
               </span>
@@ -83,24 +81,30 @@ export function HUD({
                   TU TURNO
                 </span>
               )}
+              {isLongText && !isStudentTurn && (
+                <span className="text-xs text-gray-500 italic">
+                  — leyendo por partes
+                </span>
+              )}
             </div>
           )}
 
-          {/* Dialog text */}
           {currentText && (
-            <p className="text-white text-base leading-relaxed">{currentText}</p>
+            <div className={isLongText ? 'max-h-[32vh] overflow-y-auto pr-1' : 'max-h-32 overflow-y-auto pr-1'}>
+              <p className={`text-white leading-relaxed whitespace-pre-wrap ${isLongText ? 'text-base' : 'text-sm'}`}>
+                {currentText}
+              </p>
+            </div>
           )}
 
-          {/* Student transcript */}
           {isStudentTurn && studentTranscript && (
-            <div className="mt-2 p-3 rounded-lg bg-green-900/50 border border-green-700">
-              <p className="text-green-200 text-sm italic">
+            <div className="mt-2 p-3 rounded-lg bg-green-900/50 border border-green-700 max-h-24 overflow-y-auto">
+              <p className="text-green-200 text-sm italic whitespace-pre-wrap">
                 &ldquo;{studentTranscript}&rdquo;
               </p>
             </div>
           )}
 
-          {/* Mic controls */}
           {isStudentTurn && (
             <div className="mt-3 flex items-center gap-3">
               <button
@@ -114,23 +118,12 @@ export function HUD({
                 {isListening ? '🛑 Detener' : '🎤 Hablar'}
               </button>
               {isListening && (
-                <span className="text-xs text-gray-400">
-                  Grabando tu intervencion...
-                </span>
+                <span className="text-xs text-gray-400">Grabando tu intervencion...</span>
               )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Skip button */}
-      {!isStudentTurn && currentRole && (
-        <div className="absolute bottom-4 right-4 pointer-events-auto">
-          <button className="text-xs text-gray-500 hover:text-gray-300 bg-gray-800/80 px-3 py-1 rounded transition-colors">
-            Saltar &rsaquo;
-          </button>
-        </div>
-      )}
     </div>
   );
 }

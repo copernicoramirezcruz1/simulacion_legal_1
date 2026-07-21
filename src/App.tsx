@@ -73,7 +73,7 @@ export default function App() {
 
   const { isListening, transcript, error, startListening, stopListening } =
     useSpeechRecognition();
-  const { speak, stop: stopTTS, isSpeaking } = useSpeechSynthesis();
+  const { speak, stop: stopTTS, isPreloading, preloadAll } = useSpeechSynthesis();
 
   const spokenLineRef = useRef(-1);
   const simulationStarted = useRef(false);
@@ -87,6 +87,14 @@ export default function App() {
     }
     return Array.from(roles);
   }, [scriptData.lines]);
+
+  const nonStudentLines = useMemo(
+    () =>
+      scriptData.lines
+        .filter((l) => !l.isStudentTurn && l.text)
+        .map((l) => ({ text: l.text, role: l.role })),
+    [scriptData.lines]
+  );
 
   useEffect(() => {
     if (
@@ -120,13 +128,6 @@ export default function App() {
       submitStudentResponse(text.trim());
     }
   }, [stopListening, submitStudentResponse]);
-
-  const handleSkip = useCallback(() => {
-    if (!isSpeaking && state === 'PLAYING' && currentLine && !currentLine.isStudentTurn) {
-      stopTTS();
-      advance();
-    }
-  }, [isSpeaking, state, currentLine, stopTTS, advance]);
 
   const handleRestart = useCallback(() => {
     spokenLineRef.current = -1;
@@ -196,15 +197,17 @@ const courtroomElement = (
                 <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
                   {scriptData.metadata.caso}
                 </p>
-                <button
-                  onClick={() => {
-                    simulationStarted.current = true;
-                    start();
-                  }}
-                  className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl text-lg transition-all hover:scale-105"
-                >
-                  Iniciar Audiencia
-                </button>
+          <button
+            onClick={async () => {
+              simulationStarted.current = true;
+              preloadAll(nonStudentLines);
+              start();
+            }}
+            disabled={isPreloading}
+            className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl text-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
+          >
+            {isPreloading ? 'Preparando audios...' : 'Iniciar Audiencia'}
+          </button>
                 <p className="text-xs text-gray-600 mt-4 max-w-sm mx-auto">
                   Escucharas a los miembros del tribunal. Cuando sea tu turno, presiona
                   &quot;Hablar&quot; y expresa tus argumentos.
@@ -227,14 +230,6 @@ const courtroomElement = (
             caso={scriptData.metadata.caso}
           />
 
-          {state === 'PLAYING' && currentLine && !currentLine.isStudentTurn && (
-            <button
-              onClick={handleSkip}
-              className="absolute bottom-20 right-4 z-30 text-xs text-gray-500 hover:text-gray-300 bg-gray-800/80 px-3 py-1 rounded transition-colors pointer-events-auto"
-            >
-              Saltar &rsaquo;
-            </button>
-          )}
         </>
       )}
     </div>

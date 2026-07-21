@@ -5,7 +5,8 @@ import tempfile
 import json
 import os
 import sys
-import shutil
+import hashlib
+from socketserver import ThreadingMixIn
 
 PORT = 5050
 PIPER = os.path.join(os.path.dirname(__file__), "piper", "piper")
@@ -16,7 +17,7 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 
 VOICE_MAP = {
     "PRESIDENTE": "es_ES-carlfm-x_low",
-    "VOCAL": "es_MX-ald-x_low",
+    "VOCAL": "es_ES-mls_10246-low",
     "SECRETARIA": "es_AR-daniela-high",
     "ACCIONADA": "es_ES-mls_9972-low",
     "TERCERO": "es_MX-claude-high",
@@ -52,7 +53,6 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
         text_clean = text.replace("\n", " ").strip()
 
         # Cache key
-        import hashlib
         cache_key = hashlib.md5(f"{voice}:{text_clean}".encode()).hexdigest()
         cache_file = os.path.join(CACHE_DIR, f"{cache_key}.wav")
 
@@ -73,7 +73,7 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=30,
+                timeout=300,
             )
 
             if result.returncode != 0 or not os.path.exists(cache_file):
@@ -110,10 +110,14 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
         print(f"[TTS] {args[0]}", file=sys.stderr)
 
 if __name__ == "__main__":
-    print(f"Piper TTS Server on port {PORT}")
+    print(f"Piper TTS Server on port {PORT} (multi-threaded)")
     print(f"Piper binary: {PIPER}")
     print(f"Voices: {list(VOICE_MAP.values())}")
-    server = http.server.HTTPServer(("0.0.0.0", PORT), TTSHandler)
+
+    class ThreadedServer(ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+
+    server = ThreadedServer(("0.0.0.0", PORT), TTSHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
