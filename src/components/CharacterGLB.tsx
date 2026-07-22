@@ -20,6 +20,7 @@ const ROLE_SUIT_COLORS: Record<CharacterRole, string> = {
   ACCIONANTE: '#1a3a6e',
   ACCIONADA: '#6e1a1a',
   TERCERO: '#3e1a5e',
+  SENTENCIA_FINAL: '#4a5a8a',
 };
 
 const MODEL_MAP: Record<CharacterRole, string> = {
@@ -29,6 +30,7 @@ const MODEL_MAP: Record<CharacterRole, string> = {
   ACCIONANTE: '/models/persona.glb',
   ACCIONADA: '/models/mujer.glb',
   TERCERO: '/models/persona.glb',
+  SENTENCIA_FINAL: '/models/persona.glb',
 };
 
 const TARGET_HEIGHT = 2.0;

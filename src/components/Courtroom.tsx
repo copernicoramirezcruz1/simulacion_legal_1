@@ -35,6 +35,7 @@ const ALL_CHARACTERS: CharacterConfig[] = [
   { role: 'ACCIONANTE', position: [-2.8, 0, -0.45], rotation: [0, 0.6, 0], spotlightTarget: [-2.8, 1.0, -0.15] },
   { role: 'ACCIONADA', position: [2.8, 0, -0.45], rotation: [0, -0.6, 0], spotlightTarget: [2.8, 1.0, -0.15] },
   { role: 'TERCERO', position: [0, 0, -1.2], rotation: [0, 0, 0], spotlightTarget: [0, 1.0, -0.9] },
+  { role: 'SENTENCIA_FINAL', position: [-0.7, 0, -6.3], rotation: [0, 0.1, 0], spotlightTarget: [-0.7, 1.0, -6.0] },
 ];
 
 function Chair({ position, rotation = [0, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {

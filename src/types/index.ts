@@ -4,7 +4,8 @@ export type CharacterRole =
   | 'SECRETARIA'
   | 'ACCIONANTE'
   | 'ACCIONADA'
-  | 'TERCERO';
+  | 'TERCERO'
+  | 'SENTENCIA_FINAL';
 
 export interface ScriptLine {
   role: CharacterRole;
@@ -27,6 +28,7 @@ export const ROLE_LABELS: Record<CharacterRole, string> = {
   ACCIONANTE: 'Parte Accionante',
   ACCIONADA: 'Parte Accionada',
   TERCERO: 'Tercero Interesado',
+  SENTENCIA_FINAL: 'Lectura de Sentencia',
 };
 
 export const ROLE_COLORS: Record<CharacterRole, string> = {
@@ -36,6 +38,7 @@ export const ROLE_COLORS: Record<CharacterRole, string> = {
   ACCIONANTE: '#1a5276',
   ACCIONADA: '#922b21',
   TERCERO: '#6c3483',
+  SENTENCIA_FINAL: '#b8860b',
 };
 
 export type SimulationState =

@@ -1,0 +1,20 @@
+{
+  "provider": "ollama",
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "mistral:7b"
+  },
+  "groq": {
+    "api_key": "",
+    "model": "llama-3.1-8b-instant"
+  },
+  "gemini": {
+    "api_key": "",
+    "model": "gemini-2.0-flash"
+  },
+  "openai": {
+    "url": "https://api.openai.com/v1",
+    "api_key": "",
+    "model": "gpt-4o-mini"
+  }
+}

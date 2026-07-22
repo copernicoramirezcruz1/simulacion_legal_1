@@ -1,6 +1,6 @@
 import type { ScriptData, ScriptLine, CharacterRole } from '../types';
 
-const ROLE_PATTERN = /^(PRESIDENTE|VOCAL|SECRETARIA|ACCIONANTE|ACCIONADA|TERCERO):\s*(.+)/;
+const ROLE_PATTERN = /^(PRESIDENTE|VOCAL|SECRETARIA|ACCIONANTE|ACCIONADA|TERCERO|SENTENCIA_FINAL):\s*(.+)/;
 
 export function parseScript(raw: string): ScriptData {
   const lines = raw.split('\n');

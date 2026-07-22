@@ -3,22 +3,36 @@ import type { StudentResponse } from '../hooks/useScriptEngine';
 
 interface ResultsScreenProps {
   responses: StudentResponse[];
+  sentencia: string | null;
   caso: string;
   onRestart: () => void;
 }
 
-export function ResultsScreen({ responses, caso, onRestart }: ResultsScreenProps) {
+export function ResultsScreen({ responses, sentencia, caso, onRestart }: ResultsScreenProps) {
   const [showTranscripts, setShowTranscripts] = useState(false);
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50">
-      <div className="max-w-2xl w-full mx-4 bg-gray-900 rounded-2xl border border-gray-700 p-8 max-h-[80vh] overflow-y-auto">
+      <div className="max-w-3xl w-full mx-4 bg-gray-900 rounded-2xl border border-gray-700 p-8 max-h-[85vh] overflow-y-auto">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">&#9878;</div>
           <h2 className="text-2xl font-bold text-amber-400">Audiencia Finalizada</h2>
           <p className="text-gray-400 text-sm mt-1">{caso}</p>
         </div>
 
+        {/* Sentencia */}
+        {sentencia && (
+          <div className="mb-6">
+            <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">
+              Sentencia Constitucional
+            </h3>
+            <div className="bg-gray-800/80 rounded-lg px-5 py-4 border border-amber-700/30 max-h-48 overflow-y-auto">
+              <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{sentencia}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Student interventions */}
         <div className="space-y-3 mb-6">
           <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3">
             <span className="text-gray-300">Intervenciones de la parte accionante</span>

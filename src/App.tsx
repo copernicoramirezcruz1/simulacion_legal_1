@@ -1,12 +1,14 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { Courtroom } from './components/Courtroom';
 import { HUD } from './components/HUD';
 import { ResultsScreen } from './components/ResultsScreen';
+import { SentenceOverlay } from './components/SentenceOverlay';
 import { useScriptEngine } from './hooks/useScriptEngine';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
+import { useLLM } from './hooks/useLLM';
 import { parseScript } from './utils/parseScript';
 import type { CharacterRole } from './types';
 import sampleScriptRaw from './data/sample-script.txt?raw';
@@ -74,9 +76,13 @@ export default function App() {
   const { isListening, transcript, error, startListening, stopListening } =
     useSpeechRecognition();
   const { speak, stop: stopTTS, isPreloading, preloadAll } = useSpeechSynthesis();
+  const { generateSentence, isGenerating } = useLLM();
 
+  const [modifiedSentence, setModifiedSentence] = useState<string | null>(null);
+  const [finalSentencia, setFinalSentencia] = useState<string | null>(null);
   const spokenLineRef = useRef(-1);
   const simulationStarted = useRef(false);
+  const sentenceLineIndexRef = useRef(-1);
 
   const speakingRole: CharacterRole | null = currentLine?.role ?? null;
 
@@ -96,6 +102,12 @@ export default function App() {
     [scriptData.lines]
   );
 
+  const studentArguments = useMemo(
+    () => studentResponses.map((r) => r.text).filter(Boolean),
+    [studentResponses]
+  );
+
+  // Detect sentence + trigger LLM generation
   useEffect(() => {
     if (
       state === 'PLAYING' &&
@@ -104,13 +116,61 @@ export default function App() {
       currentLine.text &&
       currentLineIndex !== spokenLineRef.current
     ) {
+      if (currentLine.role === 'SENTENCIA_FINAL') {
+        spokenLineRef.current = currentLineIndex;
+        sentenceLineIndexRef.current = currentLineIndex;
+
+        if (studentArguments.length > 0) {
+          generateSentence(currentLine.text, studentArguments).then(
+            (modified) => {
+              if (modified && sentenceLineIndexRef.current === currentLineIndex) {
+                setFinalSentencia(modified);
+                setModifiedSentence(modified);
+              }
+            }
+          );
+        } else {
+          setFinalSentencia(currentLine.text);
+          window.speechSynthesis.cancel();
+          speak(currentLine.text, 'PRESIDENTE', () => {
+            advance();
+          });
+        }
+        return;
+      }
+
+      // Normal flow: speak directly
       spokenLineRef.current = currentLineIndex;
+      sentenceLineIndexRef.current = -1;
+      setModifiedSentence(null);
       window.speechSynthesis.cancel();
       speak(currentLine.text, currentLine.role, () => {
         advance();
       });
     }
-  }, [state, currentLine, currentLineIndex, advance, speak]);
+  }, [
+    state,
+    currentLine,
+    currentLineIndex,
+    advance,
+    speak,
+    studentArguments,
+    generateSentence,
+  ]);
+
+  // Speak the modified sentence once it's ready
+  useEffect(() => {
+    if (
+      modifiedSentence &&
+      state === 'PLAYING' &&
+      currentLineIndex === sentenceLineIndexRef.current
+    ) {
+      speak(modifiedSentence, 'PRESIDENTE', () => {
+        setModifiedSentence(null);
+        advance();
+      });
+    }
+  }, [modifiedSentence, state, currentLineIndex, speak, advance]);
 
   useEffect(() => {
     if (state === 'STUDENT_TURN') {
@@ -131,14 +191,17 @@ export default function App() {
 
   const handleRestart = useCallback(() => {
     spokenLineRef.current = -1;
+    sentenceLineIndexRef.current = -1;
     simulationStarted.current = false;
+    setModifiedSentence(null);
+    setFinalSentencia(null);
     stopTTS();
     reset();
   }, [reset, stopTTS]);
 
-const courtroomElement = (
-  <Courtroom speakingRole={speakingRole} activeRoles={activeRoles} />
-);
+  const courtroomElement = (
+    <Courtroom speakingRole={speakingRole} activeRoles={activeRoles} />
+  );
 
   if (state === 'FINISHED') {
     return (
@@ -156,6 +219,7 @@ const courtroomElement = (
         </Canvas>
         <ResultsScreen
           responses={studentResponses}
+          sentencia={finalSentencia}
           caso={scriptData.metadata.caso}
           onRestart={handleRestart}
         />
@@ -184,6 +248,8 @@ const courtroomElement = (
         />
       </Canvas>
 
+      {isGenerating && <SentenceOverlay />}
+
       {(state === 'IDLE' || state === 'PLAYING' || state === 'STUDENT_TURN') && (
         <>
           {state === 'IDLE' && (
@@ -197,17 +263,17 @@ const courtroomElement = (
                 <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
                   {scriptData.metadata.caso}
                 </p>
-          <button
-            onClick={async () => {
-              simulationStarted.current = true;
-              preloadAll(nonStudentLines);
-              start();
-            }}
-            disabled={isPreloading}
-            className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl text-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
-          >
-            {isPreloading ? 'Preparando audios...' : 'Iniciar Audiencia'}
-          </button>
+                <button
+                  onClick={async () => {
+                    simulationStarted.current = true;
+                    preloadAll(nonStudentLines);
+                    start();
+                  }}
+                  disabled={isPreloading}
+                  className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl text-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
+                >
+                  {isPreloading ? 'Preparando audios...' : 'Iniciar Audiencia'}
+                </button>
                 <p className="text-xs text-gray-600 mt-4 max-w-sm mx-auto">
                   Escucharas a los miembros del tribunal. Cuando sea tu turno, presiona
                   &quot;Hablar&quot; y expresa tus argumentos.
