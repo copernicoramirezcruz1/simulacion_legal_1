@@ -1,166 +1,135 @@
-import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { getDarkWoodTexture } from '../utils/textures';
 
-function drawShield(ctx: CanvasRenderingContext2D, size: number) {
-  const cx = size / 2;
-  const cy = size / 2;
+const IMAGE_ASPECT = 853 / 1000;
 
-  // Background
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
-  grad.addColorStop(0, '#2a2a4e');
-  grad.addColorStop(1, '#0a0a20');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
+function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
+  const s = new THREE.Shape();
+  const x = -w / 2;
+  const y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h);
+  s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x, y, x + r, y);
+  return s;
+}
 
-  // Oval
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + size * 0.02, size * 0.14, size * 0.18, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#daa520';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  ctx.fillStyle = '#2a5a8c';
-  ctx.fill();
+/**
+ * Removes the white JPEG background via flood-fill from the image edges.
+ * Interior whites (the llama, condor neck, flag highlights) are NOT
+ * connected to the border, so they survive untouched.
+ */
+function makeEscudoTexture(img: HTMLImageElement): THREE.CanvasTexture {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2d context unavailable');
+  ctx.drawImage(img, 0, 0);
 
-  // Tricolor
-  ctx.fillStyle = '#E83020';
-  ctx.fillRect(cx - size * 0.13, cy - size * 0.14, size * 0.26, size * 0.04);
-  ctx.fillStyle = '#FFE033';
-  ctx.fillRect(cx - size * 0.13, cy - size * 0.10, size * 0.26, size * 0.04);
-  ctx.fillStyle = '#1EAA44';
-  ctx.fillRect(cx - size * 0.13, cy - size * 0.06, size * 0.26, size * 0.04);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  const WHITE_THRESHOLD = 232;
 
-  // Mountain
-  ctx.beginPath();
-  ctx.moveTo(cx - size * 0.09, cy + size * 0.06);
-  ctx.lineTo(cx - size * 0.04, cy - size * 0.02);
-  ctx.lineTo(cx + size * 0.01, cy + size * 0.02);
-  ctx.lineTo(cx + size * 0.08, cy - size * 0.04);
-  ctx.lineTo(cx + size * 0.12, cy + size * 0.06);
-  ctx.closePath();
-  ctx.fillStyle = '#b8956a';
-  ctx.fill();
-  ctx.strokeStyle = '#8a6a4a';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const isBackground = (i: number): boolean => {
+    const p = i * 4;
+    return (
+      data[p] >= WHITE_THRESHOLD &&
+      data[p + 1] >= WHITE_THRESHOLD &&
+      data[p + 2] >= WHITE_THRESHOLD
+    );
+  };
 
-  // Snow
-  ctx.beginPath();
-  ctx.moveTo(cx + size * 0.05, cy - size * 0.03);
-  ctx.lineTo(cx + size * 0.08, cy - size * 0.04);
-  ctx.lineTo(cx + size * 0.11, cy);
-  ctx.closePath();
-  ctx.fillStyle = '#fff';
-  ctx.fill();
+  const removed = new Uint8Array(w * h);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 1; y < h - 1; y++) stack.push(y * w, y * w + w - 1);
 
-  // Condor
-  const condorCy = cy - size * 0.17;
-  ctx.beginPath();
-  ctx.moveTo(cx - size * 0.12, condorCy + size * 0.03);
-  ctx.quadraticCurveTo(cx - size * 0.14, condorCy - size * 0.05, cx - size * 0.06, condorCy - size * 0.03);
-  ctx.lineTo(cx - size * 0.03, condorCy - size * 0.01);
-  ctx.lineTo(cx + size * 0.03, condorCy - size * 0.01);
-  ctx.lineTo(cx + size * 0.06, condorCy - size * 0.03);
-  ctx.quadraticCurveTo(cx + size * 0.14, condorCy - size * 0.05, cx + size * 0.12, condorCy + size * 0.03);
-  ctx.closePath();
-  ctx.fillStyle = '#4a3020';
-  ctx.fill();
-  ctx.strokeStyle = '#daa520';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  while (stack.length > 0) {
+    const i = stack.pop()!;
+    if (removed[i] || !isBackground(i)) continue;
+    removed[i] = 1;
+    data[i * 4 + 3] = 0;
+    const x = i % w;
+    const y = (i / w) | 0;
+    if (x > 0) stack.push(i - 1);
+    if (x < w - 1) stack.push(i + 1);
+    if (y > 0) stack.push(i - w);
+    if (y < h - 1) stack.push(i + w);
+  }
 
-  // Condor head
-  ctx.beginPath();
-  ctx.arc(cx, condorCy - size * 0.02, size * 0.025, 0, Math.PI * 2);
-  ctx.fillStyle = '#4a3020';
-  ctx.fill();
-
-  // Sun
-  const sg = ctx.createRadialGradient(cx, cy + size * 0.15, 0, cx, cy + size * 0.15, size * 0.05);
-  sg.addColorStop(0, '#fff8e0');
-  sg.addColorStop(0.5, '#FFE033');
-  sg.addColorStop(1, '#daa520');
-  ctx.beginPath();
-  ctx.arc(cx, cy + size * 0.15, size * 0.04, 0, Math.PI);
-  ctx.fillStyle = sg;
-  ctx.fill();
-
-  // Stars
-  ctx.fillStyle = '#FFE033';
-  for (let side = -1; side <= 1; side += 2) {
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 0.6 - Math.PI / 2 - Math.PI * 0.3 * side + Math.PI / 2;
-      const r = size * 0.16;
-      const sx = cx + Math.cos(a) * r * side * -1;
-      const sy = cy + size * 0.01 + Math.sin(a) * r;
-      ctx.beginPath();
-      for (let j = 0; j < 10; j++) {
-        const pr = j % 2 === 0 ? size * 0.013 : size * 0.005;
-        const pa = (j * Math.PI) / 5 - Math.PI / 2;
-        const px = sx + Math.cos(pa) * pr;
-        const py = sy + Math.sin(pa) * pr;
-        if (j === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+  // Feather: fade white halo on pixels adjacent to the removed background
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (removed[i]) continue;
+      if (!(removed[i - 1] || removed[i + 1] || removed[i - w] || removed[i + w])) continue;
+      const p = i * 4;
+      const whiteness = Math.min(data[p], data[p + 1], data[p + 2]);
+      if (whiteness > 200) {
+        data[p + 3] = Math.max(0, Math.min(255, ((235 - whiteness) / 35) * 255));
       }
-      ctx.closePath();
-      ctx.fill();
     }
   }
 
-  // Branches
-  for (let side = -1; side <= 1; side += 2) {
-    const sc = side === -1 ? '#3a8a2e' : '#4aaa3e';
-    ctx.strokeStyle = sc;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(cx + side * size * 0.09, cy + size * 0.17);
-    ctx.quadraticCurveTo(cx + side * size * 0.15, cy + size * 0.12, cx + side * size * 0.17, cy + size * 0.02);
-    ctx.stroke();
-    ctx.fillStyle = sc;
-    for (let i = 0; i < 5; i++) {
-      const t = i / 5;
-      const lx = cx + side * size * 0.09 + t * side * (size * 0.17 - size * 0.09);
-      const ly = cy + size * 0.17 + t * (cy + size * 0.02 - cy - size * 0.17);
-      ctx.beginPath();
-      ctx.ellipse(lx - side * size * 0.02, ly, size * 0.018, size * 0.008, -0.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(lx + side * size * 0.02, ly, size * 0.018, size * 0.008, 0.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+  ctx.putImageData(imageData, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
 }
 
 export function EscudoBolivia({ position }: { position: [number, number, number] }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
+  const woodTex = getDarkWoodTexture();
 
   useEffect(() => {
-    const size = 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    drawShield(ctx, size);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    if (meshRef.current) {
-      const mat = meshRef.current.material as THREE.MeshBasicMaterial;
-      mat.map = texture;
-      mat.needsUpdate = true;
-    }
+    let cancelled = false;
+    const img = new Image();
+    img.src = '/escudo-bolivia.jpg';
+    img.onload = () => {
+      if (!cancelled) setTexture(makeEscudoTexture(img));
+    };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  const W = 1.5;
+  const H = W * IMAGE_ASPECT;
+
   return (
-    <mesh ref={meshRef} position={position}>
-      <planeGeometry args={[1.4, 1.7]} />
-      <meshBasicMaterial transparent opacity={0.95} />
-    </mesh>
+    <group position={position}>
+      {/* Wooden plaque with real depth */}
+      <mesh position={[0, 0, -0.085]}>
+        <extrudeGeometry
+          args={[roundedRectShape(1.82, 1.58, 0.12), { depth: 0.06, bevelEnabled: false }]}
+        />
+        <meshStandardMaterial map={woodTex} roughness={0.45} metalness={0.15} />
+      </mesh>
+
+      {/* Gold mat — shows through the transparent background of the escudo */}
+      <mesh position={[0, 0, -0.02]}>
+        <shapeGeometry args={[roundedRectShape(1.66, 1.42, 0.08)]} />
+        <meshStandardMaterial color="#b8860b" roughness={0.28} metalness={0.75} />
+      </mesh>
+
+      {/* Escudo (self-lit so it stays readable in the dim courtroom) */}
+      {texture && (
+        <mesh>
+          <planeGeometry args={[W, H]} />
+          <meshBasicMaterial map={texture} transparent alphaTest={0.05} />
+        </mesh>
+      )}
+    </group>
   );
 }

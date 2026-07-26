@@ -130,7 +130,7 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
           await playChunk(chunks[i], role);
           if (stopRequested.current) break;
           if (i < chunks.length - 1) {
-            await new Promise((r) => setTimeout(r, 500));
+            await new Promise((r) => setTimeout(r, 150));
           }
         }
       } catch (err: any) {

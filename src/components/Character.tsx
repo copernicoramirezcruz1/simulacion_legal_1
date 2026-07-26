@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -92,20 +92,29 @@ const APPEARANCES: Record<CharacterRole, Appearance> = {
     age: 'adult',
     gender: 'male',
   },
+  SENTENCIA_FINAL: {
+    skin: '#d4a574',
+    hairColor: '#888888',
+    hairStyle: 'greyShort',
+    eyeColor: '#2d1b0e',
+    robeColor: '#1a1a2e',
+    accessory: 'medallion',
+    bodyType: 'stocky',
+    age: 'senior',
+    gender: 'male',
+  },
 };
 
 function Face({
   skin,
   eyeColor,
   hairColor,
-  hairStyle,
   accessory,
   eyeOffset = 0.06,
 }: {
   skin: string;
   eyeColor: string;
   hairColor: string;
-  hairStyle: Appearance['hairStyle'];
   accessory: Appearance['accessory'];
   eyeOffset?: number;
 }) {
@@ -469,7 +478,6 @@ export function Character({
           skin={app.skin}
           eyeColor={app.eyeColor}
           hairColor={app.hairColor}
-          hairStyle={app.hairStyle}
           accessory={app.accessory}
         />
         <Hair style={app.hairStyle} color={app.hairColor} />

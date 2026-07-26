@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { ScriptData, SimulationState } from '../types';
 
-interface StudentResponse {
+export interface StudentResponse {
   lineIndex: number;
   text: string;
 }

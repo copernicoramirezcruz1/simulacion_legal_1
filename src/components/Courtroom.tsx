@@ -38,28 +38,6 @@ const ALL_CHARACTERS: CharacterConfig[] = [
   { role: 'SENTENCIA_FINAL', position: [-0.7, 0, -6.3], rotation: [0, 0.1, 0], spotlightTarget: [-0.7, 1.0, -6.0] },
 ];
 
-function Chair({ position, rotation = [0, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
-  const woodTex = getWoodTexture();
-  return (
-    <group position={position} rotation={rotation}>
-      <mesh position={[0, -0.05, 0]} castShadow>
-        <boxGeometry args={[0.5, 0.08, 0.5]} />
-        <meshStandardMaterial map={woodTex} roughness={0.5} metalness={0.1} />
-      </mesh>
-      <mesh position={[0, 0.25, -0.23]} castShadow>
-        <boxGeometry args={[0.48, 0.55, 0.06]} />
-        <meshStandardMaterial map={woodTex} roughness={0.5} metalness={0.1} />
-      </mesh>
-      {[[-0.18, -0.2, -0.18], [0.18, -0.2, -0.18], [-0.18, -0.2, 0.18], [0.18, -0.2, 0.18]].map(([lx, ly, lz], i) => (
-        <mesh key={i} position={[lx, ly, lz]} castShadow>
-          <cylinderGeometry args={[0.03, 0.03, 0.35, 6]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.5} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
 function SpeakingSpotlight({ char }: { char: CharacterConfig }) {
   const targetObj = useMemo(() => {
     const obj = new THREE.Object3D();
@@ -189,14 +167,8 @@ export function Courtroom({ speakingRole, activeRoles }: CourtroomProps) {
         <meshStandardMaterial map={fabricTex} roughness={0.9} />
       </mesh>
 
-      {/* Escudo de Bolivia */}
+      {/* Escudo de Bolivia (placa + marco incluidos en el componente) */}
       <EscudoBolivia position={[0, 3.5, -7.35]} />
-
-      {/* Escudo frame */}
-      <mesh position={[0, 3.5, -7.3]}>
-        <ringGeometry args={[0.55, 0.6, 32]} />
-        <meshStandardMaterial color="#b8860b" roughness={0.3} metalness={0.7} />
-      </mesh>
 
       {/* Columns with marble texture */}
       {[-4.5, -2.5, 2.5, 4.5].map((x, i) => (
@@ -237,7 +209,7 @@ export function Courtroom({ speakingRole, activeRoles }: CourtroomProps) {
 
       {/* Characters */}
       {ALL_CHARACTERS.map((cfg) =>
-        activeSet.has(cfg.role) ? (
+        activeSet.has(cfg.role) && cfg.role !== 'SENTENCIA_FINAL' ? (
           <CharacterGLB
             key={cfg.role}
             role={cfg.role}

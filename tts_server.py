@@ -16,12 +16,46 @@ CACHE_DIR = os.path.join(tempfile.gettempdir(), "tts_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 VOICE_MAP = {
-    "PRESIDENTE": "es_ES-carlfm-x_low",
-    "VOCAL": "es_ES-mls_10246-low",
-    "SECRETARIA": "es_AR-daniela-high",
-    "ACCIONADA": "es_ES-mls_9972-low",
-    "TERCERO": "es_MX-claude-high",
+    "PRESIDENTE": {
+        "voice": "es_ES-sharvard-medium",
+        "speaker": 0,
+    },
+    "VOCAL": {
+        "voice": "es_ES-davefx-medium",
+    },
+    "SECRETARIA": {
+        "voice": "es_AR-daniela-high",
+    },
+    "ACCIONADA": {
+        "voice": "es_MX-claude-high",
+    },
+    "TERCERO": {
+        "voice": "es_MX-ald-x_low",
+    },
 }
+
+FALLBACK_VOICE = {
+    "voice": "es_ES-davefx-medium",
+}
+
+PROSODY_MAP = {
+    "PRESIDENTE":       {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.35},
+    "VOCAL":            {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.25},
+    "SECRETARIA":       {"length_scale": 0.95, "noise_scale": 0.667, "sentence_silence": 0.22},
+    "ACCIONANTE":       {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.25},
+    "ACCIONADA":        {"length_scale": 1.05, "noise_scale": 0.7,   "sentence_silence": 0.28},
+    "TERCERO":          {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.22},
+    "SENTENCIA_FINAL":  {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.35},
+}
+
+
+def get_voice_cfg(role):
+    return VOICE_MAP.get(role, FALLBACK_VOICE)
+
+
+def get_prosody(role):
+    return PROSODY_MAP.get(role, {"length_scale": 1.0, "noise_scale": 0.667, "sentence_silence": 0.25})
+
 
 class TTSHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
@@ -43,17 +77,21 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(400, "Empty text")
             return
 
-        voice = VOICE_MAP.get(role, "es_ES-davefx-medium")
-        model_path = os.path.join(VOICES_DIR, f"{voice}.onnx")
+        vcfg = get_voice_cfg(role)
+        voice_name = vcfg["voice"]
+        speaker = vcfg.get("speaker")
+        model_path = os.path.join(VOICES_DIR, f"{voice_name}.onnx")
 
         if not os.path.exists(model_path):
-            self.send_error(500, f"Voice model not found: {voice}")
+            self.send_error(500, f"Voice model not found: {voice_name}")
             return
 
+        prosody = get_prosody(role)
         text_clean = text.replace("\n", " ").strip()
 
-        # Cache key
-        cache_key = hashlib.md5(f"{voice}:{text_clean}".encode()).hexdigest()
+        cache_key = hashlib.md5(
+            f"{voice_name}:{speaker}:{prosody['length_scale']}:{prosody['noise_scale']}:{prosody['sentence_silence']}:{text_clean}".encode()
+        ).hexdigest()
         cache_file = os.path.join(CACHE_DIR, f"{cache_key}.wav")
 
         if os.path.exists(cache_file):
@@ -67,8 +105,20 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
             else:
                 env["LD_LIBRARY_PATH"] = LD_LIBRARY_PATH
 
+            cmd = [
+                PIPER,
+                "--model", model_path,
+                "--output_file", cache_file,
+                "--length_scale", str(prosody["length_scale"]),
+                "--noise_scale", str(prosody["noise_scale"]),
+                "--sentence_silence", str(prosody["sentence_silence"]),
+            ]
+
+            if speaker is not None:
+                cmd += ["--speaker", str(speaker)]
+
             result = subprocess.run(
-                [PIPER, "--model", model_path, "--output_file", cache_file],
+                cmd,
                 input=text_clean,
                 capture_output=True,
                 text=True,
@@ -109,10 +159,14 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[TTS] {args[0]}", file=sys.stderr)
 
+
 if __name__ == "__main__":
     print(f"Piper TTS Server on port {PORT} (multi-threaded)")
     print(f"Piper binary: {PIPER}")
-    print(f"Voices: {list(VOICE_MAP.values())}")
+    for role, cfg in VOICE_MAP.items():
+        sp = f" (speaker {cfg['speaker']})" if cfg.get("speaker") is not None else ""
+        print(f"  {role}: {cfg['voice']}{sp}")
+    print(f"  FALLBACK: {FALLBACK_VOICE['voice']}")
 
     class ThreadedServer(ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
