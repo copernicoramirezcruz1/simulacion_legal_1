@@ -10,10 +10,18 @@ import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 import { useLLM } from './hooks/useLLM';
 import { parseScript } from './utils/parseScript';
-import type { CharacterRole } from './types';
-import sampleScriptRaw from './data/sample-script.txt?raw';
+import type { CharacterRole, ScriptData } from './types';
 
-const scriptData = parseScript(sampleScriptRaw);
+const scriptModules = import.meta.glob('./data/*.txt', { query: '?raw', import: 'default' });
+
+function getScriptOptions() {
+  return Object.keys(scriptModules)
+    .map((path) => ({
+      path,
+      name: path.replace('./data/', '').replace('.txt', ''),
+    }))
+    .sort();
+}
 
 function SceneLights() {
   return (
@@ -61,6 +69,33 @@ function SceneLights() {
 }
 
 export default function App() {
+  const scriptOptions = useMemo(() => getScriptOptions(), []);
+  const [selectedPath, setSelectedPath] = useState('');
+  const [scriptData, setScriptData] = useState<ScriptData | null>(null);
+  const [loadingScript, setLoadingScript] = useState(false);
+
+  const selectScript = useCallback(async (path: string) => {
+    setSelectedPath(path);
+    setLoadingScript(true);
+    const raw = (await scriptModules[path]()) as string;
+    setScriptData(parseScript(raw));
+    setLoadingScript(false);
+  }, []);
+
+  const loadDefaultScript = useCallback(async () => {
+    if (scriptOptions.length === 0 || selectedPath) return;
+    const first = scriptOptions[0].path;
+    setSelectedPath(first);
+    setLoadingScript(true);
+    const raw = (await scriptModules[first]()) as string;
+    setScriptData(parseScript(raw));
+    setLoadingScript(false);
+  }, [scriptOptions, selectedPath]);
+
+  useEffect(() => {
+    loadDefaultScript();
+  }, [loadDefaultScript]);
+
   const {
     state,
     currentLine,
@@ -87,19 +122,22 @@ export default function App() {
   const speakingRole: CharacterRole | null = currentLine?.role ?? null;
 
   const activeRoles = useMemo(() => {
+    if (!scriptData) return [] as CharacterRole[];
     const roles = new Set<CharacterRole>();
     for (const line of scriptData.lines) {
       roles.add(line.role);
     }
     return Array.from(roles);
-  }, [scriptData.lines]);
+  }, [scriptData]);
 
   const nonStudentLines = useMemo(
     () =>
-      scriptData.lines
-        .filter((l) => !l.isStudentTurn && l.text)
-        .map((l) => ({ text: l.text, role: l.role })),
-    [scriptData.lines]
+      scriptData
+        ? scriptData.lines
+            .filter((l) => !l.isStudentTurn && l.text)
+            .map((l) => ({ text: l.text, role: l.role }))
+        : [],
+    [scriptData]
   );
 
   const studentArguments = useMemo(
@@ -220,7 +258,7 @@ export default function App() {
         <ResultsScreen
           responses={studentResponses}
           sentencia={finalSentencia}
-          caso={scriptData.metadata.caso}
+          caso={scriptData?.metadata.caso ?? ''}
           onRestart={handleRestart}
         />
       </div>
@@ -254,25 +292,58 @@ export default function App() {
         <>
           {state === 'IDLE' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-40">
-              <div className="text-center">
+              <div className="text-center max-w-lg w-full px-4">
                 <div className="text-5xl mb-4">&#9878;</div>
                 <h1 className="text-3xl font-bold text-amber-400 mb-2">
                   Simulacion de Audiencia
                 </h1>
-                <p className="text-gray-400 mb-2">{scriptData.metadata.titulo}</p>
-                <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
-                  {scriptData.metadata.caso}
-                </p>
+
+                {scriptOptions.length > 1 && (
+                  <div className="mb-4">
+                    <label className="text-gray-400 text-sm block mb-1">
+                      Selecciona un caso:
+                    </label>
+                    <select
+                      value={selectedPath}
+                      onChange={(e) => selectScript(e.target.value)}
+                      className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      {scriptOptions.map((opt) => (
+                        <option key={opt.path} value={opt.path}>
+                          {opt.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {scriptData && (
+                  <>
+                    <p className="text-gray-400 mb-2">{scriptData.metadata.titulo}</p>
+                    <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
+                      {scriptData.metadata.caso}
+                    </p>
+                  </>
+                )}
+
+                {!scriptData && (
+                  <p className="text-gray-500 text-sm mb-6">Cargando caso...</p>
+                )}
+
                 <button
                   onClick={async () => {
                     simulationStarted.current = true;
                     preloadAll(nonStudentLines);
                     start();
                   }}
-                  disabled={isPreloading}
+                  disabled={isPreloading || loadingScript || !scriptData}
                   className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl text-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-wait"
                 >
-                  {isPreloading ? 'Preparando audios...' : 'Iniciar Audiencia'}
+                  {loadingScript
+                    ? 'Cargando guion...'
+                    : isPreloading
+                      ? 'Preparando audios...'
+                      : 'Iniciar Audiencia'}
                 </button>
                 <p className="text-xs text-gray-600 mt-4 max-w-sm mx-auto">
                   Escucharas a los miembros del tribunal. Cuando sea tu turno, presiona
@@ -292,8 +363,8 @@ export default function App() {
             onStopMic={handleStopMic}
             isListening={isListening}
             error={error}
-            titulo={scriptData.metadata.titulo}
-            caso={scriptData.metadata.caso}
+            titulo={scriptData?.metadata.titulo ?? ''}
+            caso={scriptData?.metadata.caso ?? ''}
           />
 
         </>
